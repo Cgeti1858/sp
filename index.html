@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>本地视频查看器</title>
+<style>
+  /* CSS 样式 */
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px;
+  }
+  .video-card {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    width: calc(33.33% - 20px);
+  }
+  @media (max-width: 600px) {
+    .video-card {
+      width: 100%;
+    }
+  }
+  video {
+    width: 100%;
+    height: auto;
+  }
+</style>
+</head>
+<body>
+<input type="file" id="videoUpload" multiple accept="video/*">
+<div id="videoGallery"></div>
+
+<script>
+  // JavaScript 代码
+  const videoUpload = document.getElementById('videoUpload');
+  const videoGallery = document.getElementById('videoGallery');
+
+  let db;
+
+  // 打开或创建IndexedDB数据库
+  const request = indexedDB.open('VideoDatabase', 1);
+  request.onupgradeneeded = function(event) {
+    db = event.target.result;
+    const objectStore = db.createObjectStore('videos', { keyPath: 'id', autoIncrement: true });
+  };
+  request.onsuccess = function(event) {
+    db = event.target.result;
+    displayVideos();
+  };
+  request.onerror = function(event) {
+    console.error('IndexedDB error:', event.target.errorCode);
+  };
+
+  // 显示所有视频
+  function displayVideos() {
+    const transaction = db.transaction(['videos'], 'readonly');
+    const objectStore = transaction.objectStore('videos');
+    const request = objectStore.openCursor();
+    request.onsuccess = function(event) {
+      const cursor = event.target.result;
+      if (cursor) {
+        const videoCard = document.createElement('div');
+        videoCard.className = 'video-card';
+
+        const video = document.createElement('video');
+        video.controls = true;
+        video.src = URL.createObjectURL(cursor.value.blob);
+        video.onload = function() {
+          URL.revokeObjectURL(video.src);
+        };
+
+        videoCard.appendChild(video);
+        videoGallery.appendChild(videoCard);
+
+        cursor.continue();
+      }
+    };
+  }
+
+  // 上传视频并存储到IndexedDB
+  videoUpload.addEventListener('change', function(event) {
+    Array.from(event.target.files).forEach(file => {
+      const transaction = db.transaction(['videos'], 'readwrite');
+      const objectStore = transaction.objectStore('videos');
+      const request = objectStore.add({ blob: file, name: file.name });
+    });
+    displayVideos();
+  });
+</script>
+</body>
+</html>
